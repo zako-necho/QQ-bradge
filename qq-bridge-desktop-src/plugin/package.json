@@ -1,0 +1,26 @@
+{
+  "name": "dsh-gui-endpoint",
+  "version": "1.0.0",
+  "description": "给 QQ 桥接桌面版用的：把带 token 的 DSH GUI 地址吐出来，好让插件设置页能被直接打开。",
+  "type": "module",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "qq-bridge"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

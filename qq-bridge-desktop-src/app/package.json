@@ -1,0 +1,7 @@
+{
+  "name": "qq-bridge-desktop",
+  "version": "1.0.0",
+  "description": "QQ 桥接桌面版 —— 把 qq-bridge 控制台装进一个窗口",
+  "main": "main.js",
+  "private": true
+}

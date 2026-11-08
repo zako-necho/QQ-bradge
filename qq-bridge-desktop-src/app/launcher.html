@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QQ 桥接桌面版</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --line: #e3e6ea;
+    --accent: #3b82f6;
+    --ok: #2ea043;
+    --warn: #d29922;
+    --bad: #e5484d;
+    --log-bg: #fafbfc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181d;
+      --card: #1d2026;
+      --text: #e6e8eb;
+      --muted: #9aa0a6;
+      --line: #2c3038;
+      --accent: #4d8df5;
+      --log-bg: #14161a;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.6 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 48px 24px;
+    overflow-y: auto;
+  }
+  .stage { width: 100%; max-width: 640px; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 34px 36px 28px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04);
+  }
+
+  .brand { font-size: 21px; font-weight: 650; letter-spacing: -0.2px; margin-bottom: 6px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 30px; }
+
+  /* 按钮：居中、宽度一致、比例适中 */
+  .actions { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .btn {
+    width: 260px;
+    padding: 12px 20px;
+    border-radius: 9px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--text);
+    transition: border-color .15s, background .15s, transform .05s;
+  }
+  .btn:hover:not([disabled]) { border-color: var(--accent); }
+  .btn:active:not([disabled]) { transform: translateY(1px); }
+  .btn[disabled] { opacity: .5; cursor: default; }
+  .btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .btn.primary:hover:not([disabled]) { filter: brightness(1.06); }
+  .btn.small { width: auto; padding: 7px 14px; font-size: 13px; font-weight: 400; }
+  .btn.ghost { background: transparent; }
+
+  /* QQ 号输入：和按钮同宽、居中 */
+  .uin-field { width: 260px; margin-top: 4px; }
+  .uin-field input {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 9px;
+    text-align: center;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--text);
+    font: inherit;
+    font-size: 14px;
+    letter-spacing: .5px;
+  }
+  .uin-field input:focus { outline: none; border-color: var(--accent); }
+  .uin-field input::placeholder { color: var(--muted); font-size: 13px; letter-spacing: 0; }
+  .uin-hint { font-size: 12px; color: var(--muted); text-align: center; max-width: 320px; }
+
+  .status-row {
+    display: flex;
+    justify-content: center;
+    gap: 26px;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    font-size: 12.5px;
+    color: var(--muted);
+    flex-wrap: wrap;
+  }
+  .status-row b { font-weight: 500; margin-left: 5px; }
+
+  .progress {
+    margin-top: 16px;
+    min-height: 20px;
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--warn);
+  }
+  .progress.error { color: var(--bad); }
+  .progress.ok { color: var(--ok); }
+
+  /* SnowLuma 面板 */
+  .hidden { display: none; }
+  .panel-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .panel-head .title { font-size: 15px; font-weight: 600; }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 12px;
+    background: rgba(127,127,127,.14);
+    color: var(--muted);
+  }
+  .badge.ok { background: rgba(46,160,67,.15); color: var(--ok); }
+  .badge.bad { background: rgba(229,72,77,.14); color: var(--bad); }
+  .badge.warn { background: rgba(210,153,34,.15); color: var(--warn); }
+
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+
+  .log-hint { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+
+  .log {
+    margin: 0;
+    height: 300px;
+    overflow-y: auto;
+    background: var(--log-bg);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 8px 0;
+    font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
+    font-size: 12.5px;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: var(--text);
+  }
+  .log-line { padding: 1px 14px; }
+  .log-line:hover { background: rgba(127,127,127,.07); }
+  .log-time { color: var(--muted); }
+  .log-empty { padding: 10px 14px; color: var(--muted); }
+
+  /* 细滚动条 */
+  .log::-webkit-scrollbar { width: 8px; }
+  .log::-webkit-scrollbar-thumb { background: rgba(127,127,127,.35); border-radius: 4px; }
+  .log::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <div class="card">
+    <div class="brand">QQ 桥接桌面版</div>
+    <div class="sub">把 QQ 消息接进 DeepSeek Harness。「开始桥接」会先确认 DSH 在不在——没开就帮你启动。</div>
+
+    <div class="actions">
+      <button id="btn-start" class="btn primary">开始桥接</button>
+      <button id="btn-snow" class="btn">配置 SnowLuma</button>
+      <div class="uin-field">
+        <input id="uin" type="text" inputmode="numeric" autocomplete="off" placeholder="要监听的 QQ 号（可选）">
+      </div>
+      <div class="uin-hint">登录了多个 QQ 时填这里，启动前会按它准备 SnowLuma 的账号配置</div>
+
+    </div>
+
+    <div class="uin-hint" style="margin:14px auto 0; max-width:460px; text-align:center">
+      已经在用原版 qq-bridge？本程序会直接接管它（配置、数据都不用搬）。
+      找不到的话，<a id="locateBridge" style="cursor:pointer;text-decoration:underline;color:var(--accent)">选一下目录</a>。
+    </div>
+
+    <div class="status-row">
+      <span>DSH<b id="s-dsh" style="color:var(--muted)">检测中…</b></span>
+      <span>SnowLuma<b id="s-snow" style="color:var(--muted)">检测中…</b></span>
+      <span>桥接<b id="s-bridge" style="color:var(--muted)">检测中…</b></span>
+    </div>
+
+    <div id="progress" class="progress"></div>
+  </div>
+
+  <div id="snow-panel" class="card hidden">
+    <div class="panel-head">
+      <span class="title">SnowLuma（QQ 协议端）</span>
+      <span id="snow-badge" class="badge">未运行</span>
+    </div>
+
+    <div id="snow-path" class="log-hint" style="margin-bottom:12px">正在查找 SnowLuma…</div>
+
+    <div class="row">
+      <button id="snow-start" class="btn small primary">启动</button>
+      <button id="snow-stop" class="btn small">停止</button>
+      <button id="snow-takeover" class="btn small">接管外部进程</button>
+      <button id="snow-clear" class="btn small ghost">清空日志</button>
+    </div>
+
+    <div class="row" id="snow-install-row">
+      <button id="snow-download" class="btn small">去 GitHub 下载 SnowLuma</button>
+      <button id="snow-locate" class="btn small">选择安装目录</button>
+    </div>
+
+    <div class="log-hint" id="snow-hint">SnowLuma 的输出会实时显示在这里。首次使用需要在日志里扫码登录 QQ。</div>
+    <pre id="snow-log" class="log"><div class="log-empty">（还没有输出）</div></pre>
+  </div>
+
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const api = window.__qqDesktop;
+  const $ = (id) => document.getElementById(id);
+  const MAX_LINES = 800;
+  let logLines = 0;
+
+  if (!api) {
+    $('progress').textContent = '预加载脚本没有生效，功能不可用。';
+    $('progress').className = 'progress error';
+    return;
+  }
+
+  /* ---------- 状态 ---------- */
+
+  function paintStatus(s) {
+    const dsh = $('s-dsh');
+    dsh.textContent = s.dshRunning ? '运行中' : '未运行';
+    dsh.style.color = s.dshRunning ? 'var(--ok)' : 'var(--muted)';
+
+    const snow = $('s-snow');
+    snow.textContent = s.snowluma.running ? '运行中' : '未运行';
+    snow.style.color = s.snowluma.running ? 'var(--ok)' : 'var(--muted)';
+
+    const bridge = $('s-bridge');
+    bridge.textContent = s.bridgeRunning ? ('运行中 :' + s.bridgePort) : '未启动';
+    bridge.style.color = s.bridgeRunning ? 'var(--ok)' : 'var(--bad)';
+
+    const badge = $('snow-badge');
+    if (s.snowluma.managed) {
+      badge.textContent = '由本程序托管';
+      badge.className = 'badge ok';
+    } else if (s.snowluma.running) {
+      badge.textContent = '外部进程（看不到输出）';
+      badge.className = 'badge warn';
+    } else {
+      badge.textContent = '未运行';
+      badge.className = 'badge';
+    }
+
+    // 路径提示
+    const pathLine = $('snow-path');
+    if (s.snowluma.installed) {
+      pathLine.textContent = '已找到：' + s.snowluma.root;
+      pathLine.style.color = 'var(--muted)';
+    } else {
+      pathLine.innerHTML = '还没找到 SnowLuma。去 GitHub 下载，解压到任意目录，再点「选择安装目录」。';
+      pathLine.style.color = 'var(--warn)';
+    }
+    $('snow-start').disabled = !s.snowluma.installed;
+    $('snow-stop').disabled = !s.snowluma.running;
+  }
+
+  async function refresh() {
+    try {
+      paintStatus(await api.status());
+    } catch (error) {
+      $('progress').textContent = '读状态失败：' + error.message;
+      $('progress').className = 'progress error';
+    }
+  }
+
+  /* ---------- 进度 ---------- */
+
+  api.onProgress((p) => {
+    if (!p || !p.text) return;
+    $('progress').textContent = p.text;
+    $('progress').className = 'progress' + (p.level === 'error' ? ' error' : '');
+  });
+
+  /* ---------- 开始桥接 ---------- */
+
+  $('btn-start').onclick = async () => {
+    const button = $('btn-start');
+    const uin = $('uin').value.trim();
+    if (uin && !/^\d{5,12}$/.test(uin)) {
+      $('progress').textContent = 'QQ 号应该是 5~12 位数字（也可以留空）';
+      $('progress').className = 'progress error';
+      return;
+    }
+    button.disabled = true;
+    button.textContent = '正在启动…';
+    $('progress').className = 'progress';
+    $('progress').textContent = '准备中…';
+    try {
+      const result = await api.start(uin);
+      if (result.ok && result.warning) {
+        $('progress').textContent = result.warning;
+        $('progress').className = 'progress';
+      } else if (result.ok) {
+        $('progress').textContent = '已启动，正在进入控制台…';
+        $('progress').className = 'progress ok';
+      } else {
+        $('progress').textContent = result.detail || '启动失败';
+        $('progress').className = 'progress error';
+        button.disabled = false;
+        button.textContent = '开始桥接';
+      }
+    } catch (error) {
+      $('progress').textContent = '启动失败：' + error.message;
+      $('progress').className = 'progress error';
+      button.disabled = false;
+      button.textContent = '开始桥接';
+    }
+  };
+
+  /* ---------- SnowLuma 面板 ---------- */
+
+  $('btn-snow').onclick = () => {
+    const panel = $('snow-panel');
+    const hidden = panel.classList.contains('hidden');
+    panel.classList.toggle('hidden', !hidden);
+    if (hidden) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    refresh();
+  };
+
+  function appendLog(text) {
+    const log = $('snow-log');
+    const empty = log.querySelector('.log-empty');
+    if (empty) empty.remove();
+
+    const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+    for (const raw of String(text).split(/\r?\n/)) {
+      const line = raw.replace(/\u001b\[[0-9;]*[A-Za-z]/g, '').replace(/\s+$/, '');
+      if (!line) continue;
+      const div = document.createElement('div');
+      div.className = 'log-line';
+      const stamp = document.createElement('span');
+      stamp.className = 'log-time';
+      stamp.textContent = '[' + time + '] ';
+      div.append(stamp, document.createTextNode(line));
+      log.append(div);
+      logLines += 1;
+      while (logLines > MAX_LINES) {
+        const first = log.querySelector('.log-line');
+        if (!first) break;
+        first.remove();
+        logLines -= 1;
+      }
+    }
+    log.scrollTop = log.scrollHeight;
+  }
+
+  api.snowluma.onLog((chunk) => appendLog(chunk));
+
+  $('snow-start').onclick = async () => {
+    $('progress').textContent = '正在启动 SnowLuma…';
+    $('progress').className = 'progress';
+    try {
+      const result = await api.snowluma.start();
+      $('progress').textContent = result.detail || (result.ok ? 'SnowLuma 已启动' : '启动失败');
+      $('progress').className = 'progress ' + (result.ok ? 'ok' : 'error');
+      await refresh();
+    } catch (error) {
+      $('progress').textContent = '启动失败：' + error.message;
+      $('progress').className = 'progress error';
+    }
+  };
+
+  $('snow-stop').onclick = async () => {
+    try {
+      const result = await api.snowluma.stop();
+      $('progress').textContent = result.detail || '已停止';
+      $('progress').className = 'progress';
+      await refresh();
+    } catch (error) {
+      $('progress').textContent = '停止失败：' + error.message;
+      $('progress').className = 'progress error';
+    }
+  };
+
+  $('snow-takeover').onclick = async () => {
+    if (!confirm('会先停掉当前外部启动的 SnowLuma，再由本程序重新启动（这样才能看到它的输出）。继续？')) return;
+    $('progress').textContent = '正在接管…';
+    try {
+      const result = await api.snowluma.takeover();
+      $('progress').textContent = result.detail || (result.ok ? '已接管' : '接管失败');
+      $('progress').className = 'progress ' + (result.ok ? 'ok' : 'error');
+      await refresh();
+    } catch (error) {
+      $('progress').textContent = '接管失败：' + error.message;
+      $('progress').className = 'progress error';
+    }
+  };
+
+  $('snow-clear').onclick = () => {
+    const log = $('snow-log');
+    log.innerHTML = '<div class="log-empty">（还没有输出）</div>';
+    logLines = 0;
+  };
+
+  $('snow-download').onclick = () => {
+    api.snowluma.openDownload();
+    $('progress').textContent = '已在浏览器打开 GitHub Releases，下载后解压，再点「选择安装目录」。';
+    $('progress').className = 'progress';
+  };
+
+  $('snow-locate').onclick = async () => {
+    try {
+      const result = await api.snowluma.locate();
+      $('progress').textContent = result.detail || '完成';
+      $('progress').className = 'progress ' + (result.ok ? 'ok' : 'error');
+      await refresh();
+    } catch (error) {
+      $('progress').textContent = '选择目录失败：' + error.message;
+      $('progress').className = 'progress error';
+    }
+  };
+
+  /* ---------- 启动 ---------- */
+
+  // 读回上次填的 QQ 号
+  (async () => {
+    try {
+      const saved = await api.settings();
+      if (saved && saved.uin) $('uin').value = saved.uin;
+    } catch (error) {
+      /* 读不到就算了 */
+    }
+  })();
+
+  // QQ 号边输边存：停手 500ms 就落盘，下次打开自动带出来
+  let uinSaveTimer = null;
+  let lastSavedUin = null;
+
+  async function saveUin(silent) {
+    const value = $('uin').value.replace(/\D/g, '').trim();
+    if (value !== $('uin').value) $('uin').value = value;
+    if (value && !/^\d{5,12}$/.test(value)) {
+      if (!silent) {
+        $('progress').textContent = 'QQ 号应该是 5~12 位数字';
+        $('progress').className = 'progress error';
+      }
+      return;
+    }
+    if (value === lastSavedUin) return;
+    try {
+      await api.saveUin(value);
+      lastSavedUin = value;
+      if (!silent) {
+        $('progress').textContent = value ? ('已记住要监听：' + value) : '已清空 QQ 号';
+        $('progress').className = 'progress';
+      }
+    } catch (error) {
+      if (!silent) {
+        $('progress').textContent = '保存失败：' + error.message;
+        $('progress').className = 'progress error';
+      }
+    }
+  }
+
+  $('uin').addEventListener('input', () => {
+    clearTimeout(uinSaveTimer);
+    uinSaveTimer = setTimeout(() => saveUin(true), 500);
+  });
+  $('uin').addEventListener('change', () => {
+    clearTimeout(uinSaveTimer);
+    void saveUin(false);
+  });
+  $('uin').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') { event.preventDefault(); $('uin').blur(); }
+  });
+
+  // 选 qq-bridge 目录
+  var locateLink = document.getElementById('locateBridge');
+  if (locateLink) {
+    locateLink.addEventListener('click', async function () {
+      try {
+        var r = await api.locateBridge();
+        $('progress').textContent = r.detail || (r.ok ? '已设置' : '未设置');
+        $('progress').className = 'progress ' + (r.ok ? 'ok' : 'error');
+      } catch (error) {
+        $('progress').textContent = '选择目录失败：' + error.message;
+        $('progress').className = 'progress error';
+      }
+    });
+  }
+
+  refresh();
+  setInterval(refresh, 4000);
+})();
+</script>
+</body>
+</html>

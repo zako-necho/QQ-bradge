@@ -1,0 +1,5 @@
+# dsh-gui-endpoint 的 loader patch
+- insert:
+    - id: dsh-gui-endpoint
+      name: dsh-gui-endpoint
+      config: {}
